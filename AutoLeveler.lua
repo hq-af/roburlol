@@ -1,4 +1,4 @@
--- https://raw.githubusercontent.com/hq-af/roburlol/AutoLeveler.lua
+-- https://raw.githubusercontent.com/hq-af/roburlol/main/AutoLeveler.lua
 
 module("AutoLeveler", package.seeall, log.setup)
 clean.module("AutoLeveler", clean.seeall, log.setup)
