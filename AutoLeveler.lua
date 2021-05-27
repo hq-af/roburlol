@@ -8,14 +8,14 @@ local Menu = _G.Libs.NewMenu
 local Player = _G.Player
 local SpellSlots = _G.CoreEx.Enums.SpellSlots
 local Input = _G.CoreEx.Input
+local Game = _G.CoreEx.Game
 
 local AutoLeveler = {}
+AutoLeveler.SleepUntil = 0
 
 function AutoLeveler.SetupMenu()
     Menu.RegisterMenu("AutoLeveler", "AutoLeveler", function()
-
         Menu.Checkbox("LevelEnable" .. Player.CharName, "Enable for " .. Player.CharName, false)
-       
         Menu.Separator()
         Menu.Text("Spell Order")
         Menu.Slider("LevelOrderR" .. Player.CharName, "R", 1, 1, 4)
@@ -25,6 +25,7 @@ function AutoLeveler.SetupMenu()
         Menu.Checkbox("LevelAll" .. Player.CharName, "Learn all spells first", true)
         Menu.Separator()
         Menu.Slider("LevelAt" .. Player.CharName, "Start at level >=", 4, 1, 18)
+		Menu.Slider("LevelDelay", "Delay (ms)", 100, 0, 5000)
     end)
 end
 
@@ -33,12 +34,19 @@ function AutoLeveler.OnTick()
        or not Menu.Get("LevelEnable" .. Player.CharName) 
        or Player.Level < Menu.Get("LevelAt" .. Player.CharName)
     then return end
+	
+    if AutoLeveler.SleepUntil == 0 then
+		AutoLeveler.SleepUntil = Game.GetTime()*1000 + Menu.Get("LevelDelay")
+        return
+	elseif Game.GetTime()*1000 < AutoLeveler.SleepUntil then return end
+	
+    AutoLeveler.SleepUntil = 0
 
     local order = { 
-        { Menu.Get("LevelOrderR" .. Player.CharName), SpellSlots.R,  Player:CanLevelSpell(SpellSlots.R), Player:GetSpell(SpellSlots.R).Level},
-        { Menu.Get("LevelOrderQ" .. Player.CharName), SpellSlots.Q,  Player:CanLevelSpell(SpellSlots.Q), Player:GetSpell(SpellSlots.Q).Level},
-        { Menu.Get("LevelOrderW" .. Player.CharName), SpellSlots.W,  Player:CanLevelSpell(SpellSlots.W), Player:GetSpell(SpellSlots.W).Level},
-        { Menu.Get("LevelOrderE" .. Player.CharName), SpellSlots.E,  Player:CanLevelSpell(SpellSlots.E), Player:GetSpell(SpellSlots.E).Level}
+        { Menu.Get("LevelOrderR" .. Player.CharName), SpellSlots.R,  Player:CanLevelSpell(SpellSlots.R), Player:GetSpell(SpellSlots.R).Level },
+        { Menu.Get("LevelOrderQ" .. Player.CharName), SpellSlots.Q,  Player:CanLevelSpell(SpellSlots.Q), Player:GetSpell(SpellSlots.Q).Level },
+        { Menu.Get("LevelOrderW" .. Player.CharName), SpellSlots.W,  Player:CanLevelSpell(SpellSlots.W), Player:GetSpell(SpellSlots.W).Level },
+        { Menu.Get("LevelOrderE" .. Player.CharName), SpellSlots.E,  Player:CanLevelSpell(SpellSlots.E), Player:GetSpell(SpellSlots.E).Level }
     }
 
     table.sort(order, function(a, b)
