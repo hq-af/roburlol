@@ -25,7 +25,7 @@ function AutoLeveler.SetupMenu()
         Menu.Checkbox("LevelAll" .. Player.CharName, "Learn all spells first", true)
         Menu.Separator()
         Menu.Slider("LevelAt" .. Player.CharName, "Start at level >=", 4, 1, 18)
-		Menu.Slider("LevelDelay", "Delay (ms)", 100, 0, 5000)
+        Menu.Slider("LevelDelay", "Delay (ms)", 100, 0, 5000)
     end)
 end
 
