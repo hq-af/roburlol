@@ -38,7 +38,7 @@ function AutoLeveler.OnTick()
     if AutoLeveler.SleepUntil == 0 then
 		AutoLeveler.SleepUntil = Game.GetTime()*1000 + Menu.Get("LevelDelay")
         return
-	elseif Game.GetTime()*1000 < AutoLeveler.SleepUntil then return end
+    elseif Game.GetTime()*1000 < AutoLeveler.SleepUntil then return end
 	
     AutoLeveler.SleepUntil = 0
 
