@@ -17,12 +17,14 @@ if _G.Player.CharName ~= "Diana" then return false end
 --#region Configuration
 local CONFIG = {
   MODULE_NAME = "hqDiana",
-  MODULE_VERSION = "1.0.0",
-  MODULE_AUTHOR = "hq.af"
+  MODULE_VERSION = "1.0.1",
+  MODULE_AUTHOR = "hq.af",
+  UPDATE_URL = "https://raw.githubusercontent.com/hq-af/roburlol/main/hqDiana.lua"
 }
 
 module(CONFIG.MODULE_NAME, package.seeall, log.setup)
 clean.module(CONFIG.MODULE_NAME, package.seeall, log.setup)
+
 --#endregion
 
 --[[
@@ -183,9 +185,7 @@ local Diana = {
   },
 
   -- Texts
-  ComboRTextSize = API.Renderer.CalcTextSize("Combo R Active"),
   ComboRText = "Combo R Active",
-  AutoHarassTextSize = API.Renderer.CalcTextSize("Auto Harass"),
   AutoHarassText = "Auto Harass",
 
   -- Spells
@@ -211,7 +211,7 @@ local Diana = {
     Delay = 0.25,
     Type = "Circular",
     Radius = 475,
-    RadiusSqr = 475*475
+    RadiusSqr = 225625
   })
 }
 --#endregion
@@ -222,7 +222,6 @@ setmetatable(Config, {
     return Menu and Menu.Get(key, true)
   end
 })
-
 
 --#region Q Zone
 function Diana.InitZones(endPos)
@@ -601,7 +600,7 @@ end
 function Diana.OnProcessSpell(source, spell)
   if Config.RInterrupt and
     source.TeamId ~= API.Player.TeamId and source.IsHero and spell.SpellData and
-    Diana.EnemySpellsHashTable[spell.SpellData.Name] and --data.charName .. data.slot
+    Diana.EnemySpellsHashTable[spell.SpellData.Name] and
     (Config[Diana.EnemySpellsHashTable[spell.SpellData.Name]] or Config[source.CharName .. "_" .. Diana.EnemySpellsHashTable[spell.SpellData.Name]]) and
     Diana.CanCast(Diana.R, true) and source.Position:DistanceSqr(API.Player) < Diana.R.RadiusSqr then
       Diana.R:Cast()
@@ -777,7 +776,7 @@ function Diana.OnDraw()
     pos.y = pos.y + 100
     pos.x = pos.x + 80
     off = 50
-    API.Renderer.DrawText(pos:ToScreen(), Diana.ComboRTextSize, Diana.ComboRText, 0xFF0000FF)
+    API.Renderer.DrawText(pos:ToScreen(), API.Renderer.CalcTextSize(Diana.ComboRText), Diana.ComboRText, 0xFF0000FF)
   end
 
   if Config.DrawAutoHarass and Config.AutoHarassToggle then
@@ -785,7 +784,7 @@ function Diana.OnDraw()
     pos.y = pos.y + 100 - off
     pos.x = pos.x + 80
 
-    API.Renderer.DrawText(pos:ToScreen(), Diana.AutoHarassTextSize, Diana.AutoHarassText, 0xB4FF00FF)
+    API.Renderer.DrawText(pos:ToScreen(), API.Renderer.CalcTextSize(Diana.AutoHarassText), Diana.AutoHarassText, 0xB4FF00FF)
   end
 
 end
@@ -810,9 +809,11 @@ end
   ====================================================================================================
 --]]
 --#region Entrypoint
+
 function OnLoad()
   INFO(CONFIG.MODULE_NAME .. " v" .. CONFIG.MODULE_VERSION .. " by " .. CONFIG.MODULE_AUTHOR .. " loaded")
   Diana.Init()
   return true
 end
 --#endregion
+
