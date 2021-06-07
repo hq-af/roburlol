@@ -627,6 +627,7 @@ end
 
 --#region Farm
 function Diana.Farm()
+
   if Config.UseQFarm and Diana.CanCast(Diana.Q) then
     local targets = Diana.GetFarmMinions(Diana.Q.Range, false)
     local position, count = Diana.Q:GetBestCircularCastPos(targets)
@@ -639,6 +640,13 @@ function Diana.Farm()
         end
       end
       Diana.Q:Cast(position)
+      return
+    end
+  end
+
+  -- dont use other spells if passive is up
+  for _, buff in pairs(API.Player.Buffs) do
+    if buff ~= nil and API.Game.GetTime() < buff.EndTime - 0.5 and buff.Name == "dianapbonusas" then
       return
     end
   end
