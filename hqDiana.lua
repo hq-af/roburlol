@@ -634,19 +634,12 @@ function Diana.Farm()
 
     if position and count and count > 0 then
       if table.getn(targets) > 1 and count and count == 1 then
-        local orbTarget = API.Orbwalker.GetTarget()
-        if orbTarget and orbTarget.IsMonster and orbTarget.DistanceSqr(API.Player) < Diana.Q.Range*Diana.Q.Range then
+        local orbTarget = API.Orbwalker.GetLastTarget()
+        if orbTarget and orbTarget.IsValid and orbTarget.IsAlive and orbTarget.IsMonster and orbTarget.Position:DistanceSqr(API.Player) < 300*300 then
           position = orbTarget:FastPrediction(250 + API.Game.GetLatency())
         end
       end
       Diana.Q:Cast(position)
-      return
-    end
-  end
-
-  -- dont use other spells if passive is up
-  for _, buff in pairs(API.Player.Buffs) do
-    if buff ~= nil and API.Game.GetTime() < buff.EndTime - 0.5 and buff.Name == "dianapbonusas" then
       return
     end
   end
@@ -659,12 +652,23 @@ function Diana.Farm()
     end
   end
 
+ 
   if Config.UseEFarm and Diana.CanCast(Diana.E) then
     local targets = Diana.GetFarmMinions(Diana.E.Range, true)
     if table.getn(targets) > 0 then
-      local orbTarget = API.Orbwalker.GetTarget()
+      local orbTarget = API.Orbwalker.GetLastTarget()
+
+       -- dont use e if has target and passive is up
+      if orbTarget and orbTarget.IsValid and orbTarget.IsAlive and orbTarget.Position:DistanceSqr(API.Player) < 300*300 then
+        for _, buff in pairs(API.Player.Buffs) do
+          if buff ~= nil and API.Game.GetTime() < buff.EndTime - 0.5 and buff.Name == "dianapbonusas" then
+            return
+          end
+        end
+      end
+
       table.sort(targets, function(a, b)
-        if orbTarget and orbTarget.IsMonster and a == orbTarget then return true end
+        if orbTarget and orbTarget.IsValid and orbTarget.IsAlive and orbTarget.IsMonster and a == orbTarget then return true end
         if a.Health < b.Health and a.Health < Diana.E:GetDamage(a) then return true end
         return a.MaxHealth > b.MaxHealth
       end)
