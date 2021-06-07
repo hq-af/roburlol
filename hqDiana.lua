@@ -17,9 +17,10 @@ if _G.Player.CharName ~= "Diana" then return false end
 --#region Configuration
 local CONFIG = {
   MODULE_NAME = "hqDiana",
-  MODULE_VERSION = "1.0.1",
+  MODULE_VERSION = "1.0.2",
   MODULE_AUTHOR = "hq.af",
-  UPDATE_URL = "https://raw.githubusercontent.com/hq-af/roburlol/main/hqDiana.lua"
+  UPDATE_URL = "https://raw.githubusercontent.com/hq-af/roburlol/main/hqDiana.lua",
+  CHANGELOG = "added jungle/lane clear"
 }
 
 module(CONFIG.MODULE_NAME, package.seeall, log.setup)
@@ -295,31 +296,6 @@ function Diana.OnDeleteObject(obj)
 end
 --#endregion
 
---#region Q Buff
-function Diana.HasQBuff(unit, delay)
-  local buff = unit:GetBuff("dianamoonlight")
-  if buff == nil or buff.EndTime*1000 - delay < API.Game.GetTime()*1000 then return false end
-  
-  return true
-end
-
-function Diana.GetBuffTargets(range, team, type, delay)
-  local result = {}
-
-  local distSqr = range*range
-  for _, target in pairs(API.ObjectManager.GetNearby(team, type)) do
-    if (team ~= "neutral" or target.IsMonster) and target.IsValid and target.IsAlive and target.IsTargetable and target.Position:DistanceSqr(API.Player) < distSqr then 
-      for _, buff in pairs(target.Buffs) do
-        if Diana.HasQBuff(target, delay) then
-          table.insert(result, target)
-        end
-      end
-    end
-  end
-
-  return result
-end
---#endregion
 
 --#region QCrescentPrediction
 function Diana.QCrescentPrediction(target, hitMax)
@@ -457,6 +433,47 @@ function Diana.CastWIfHitAny()
   end
 
   return false
+end
+
+function Diana.HasQBuff(unit, delay)
+  local buff = unit:GetBuff("dianamoonlight")
+  if buff == nil or buff.EndTime*1000 - delay < API.Game.GetTime()*1000 then return false end
+  
+  return true
+end
+
+function Diana.GetBuffTargets(range, team, type, delay)
+  local result = {}
+
+  local distSqr = range*range
+  for _, target in pairs(API.ObjectManager.GetNearby(team, type)) do
+    if (team ~= "neutral" or target.IsMonster) and target.IsValid and target.IsAlive and target.IsTargetable and target.Position:DistanceSqr(API.Player) < distSqr then 
+      for _, buff in pairs(target.Buffs) do
+        if Diana.HasQBuff(target, delay) then
+          table.insert(result, target)
+        end
+      end
+    end
+  end
+
+  return result
+end
+
+function Diana.GetFarmMinions(range, checkBuff)
+  local result = {}
+
+  local distSqr = range*range
+  for team, list in pairs({["enemy"] = API.ObjectManager.GetNearby("enemy", "minions"), ["neutral"] = API.ObjectManager.GetNearby("neutral", "minions")}) do
+    for _, target in pairs(list) do
+      if (team ~= "neutral" or target.IsMonster) and target.IsValid and target.IsAlive and target.IsTargetable and target.Position:DistanceSqr(API.Player) < distSqr then
+        if not checkBuff or Diana.HasQBuff(target, API.Game.GetLatency() + 100) then
+          table.insert(result, target)
+        end
+      end
+    end
+  end
+  
+  return result
 end
 --#endregion
 
@@ -608,6 +625,48 @@ function Diana.OnProcessSpell(source, spell)
 end
 --#endregion
 
+--#region Farm
+function Diana.Farm()
+  if Config.UseQFarm and Diana.CanCast(Diana.Q) then
+    local targets = Diana.GetFarmMinions(Diana.Q.Range, false)
+    local position, count = Diana.Q:GetBestCircularCastPos(targets)
+
+    if position and count and count > 0 then
+      if count and count == 1 then
+        local orbTarget = API.Orbwalker.GetTarget()
+        if orbTarget and orbTarget.IsMonster and and orbTarget.DistanceSqr(API.Player) < Diana.Q.Range*Diana.Q.Range then
+          position = orbTarget:FastPrediction(250 + API.Game.GetLatency())
+        end
+      end
+      Diana.Q:Cast(position)
+      return
+    end
+  end
+
+  if Config.UseWFarm and Diana.CanCast(Diana.W) then
+    local nbHit = table.getn(Diana.GetFarmMinions(Diana.W.Radius, false))
+    if nbHit > 0 then
+      Diana.W:Cast()
+      return
+    end
+  end
+
+  if Config.UseEFarm and Diana.CanCast(Diana.E) then
+    local targets = Diana.GetFarmMinions(Diana.E.Range, true)
+    if table.getn(targets) > 0 then
+      local orbTarget = API.Orbwalker.GetTarget()
+      table.sort(targets, function(a, b)
+        if orbTarget and orbTarget.IsMonster and a == orbTarget then return true end
+        if a.Health < b.Health and a.Health < Diana.E:GetDamage(a) then return true end
+        return a.MaxHealth > b.MaxHealth
+      end)
+      Diana.E:Cast(targets[1])
+      return
+    end
+  end
+end
+--#endregion
+
 --#region InitEnemySpells
 function Diana.InitEnemySpells()
   local slots = {["Q"] = API.Enums.SpellSlots.Q, ["W"] = API.Enums.SpellSlots.W, ["E"] = API.Enums.SpellSlots.E, ["R"] = API.Enums.SpellSlots.R}
@@ -648,6 +707,9 @@ function Diana.OnTick()
 
   if mode == "Combo" then
     Diana.Combo()
+  elseif mode == "Waveclear" and API.Player.ManaPercent * 100 > Config.FarmMinManaPercent then
+    Diana.Farm()
+  -- should stay last (auto harass toggle) /!\
   elseif (mode == "Harass" or Config.AutoHarassToggle) and API.Player.ManaPercent * 100 > Config.HarassMinManaPercent then
     Diana.Harass()
   end 
@@ -664,7 +726,7 @@ function Diana.SetupMenu()
     Menu.NewTree("Prediction", "Prediction", function()
       Menu.Text("Crescent Prediction", true)
       Menu.Checkbox("CrescentPrediction", "Use Advanced Q Prediction", true)
-      Menu.Checkbox("PredictEHit", "Use E Hit Prediction", true)
+      Menu.Checkbox("PredictEHit", "Use E Hit Prediction (Combo)", true)
       Menu.Separator()
       Menu.Text("Normal Prediction (^ If Advanced Q Is Disabled ^)", true)
       Menu.Slider("NormalPredictionHitChance", "Q Hit Chance", 0.8, 0.01, 1, 0.01)
@@ -682,6 +744,13 @@ function Diana.SetupMenu()
       Menu.Checkbox("UseQHarass", "Use Q", true)
       Menu.Checkbox("UseWHarass", "Use W", true)
       Menu.Keybind("AutoHarassToggle", "Auto Harass Toggle", 87 --[[ Z ]], true)
+    end)
+
+    Menu.NewTree("Farm", "Lane/Jungle Farm", function()
+      Menu.Slider("FarmMinManaPercent", "Min Mana %", 50, 0, 100, 1)
+      Menu.Checkbox("UseQFarm", "Use Q")
+      Menu.Checkbox("UseWFarm", "Use W")
+      Menu.Checkbox("UseEFarm", "Use E (if reset)")
     end)
 
     Menu.NewTree("KillSteal", "KillSteal", function()
@@ -748,26 +817,26 @@ end
 --#region Draw
 function Diana.OnDraw()
 
-  if Menu.Get("DrawZones") and Diana.Crescent ~= nil then
+  if Config.DrawZones and Diana.Crescent ~= nil then
     Diana.Cone:Draw()
     Diana.Crescent:Draw()
     Diana.Explosion:Draw()
   end
 
   if Config.DrawQ and Diana.Q:IsReady() then
-    API.Renderer.DrawCircle3D(API.Player.Position, Diana.Q.Range, 30, 3, Menu.Get("DrawQColor"))
+    API.Renderer.DrawCircle3D(API.Player.Position, Diana.Q.Range, 30, 3, Config.DrawQColor)
   end
 
   if Config.DrawW and Diana.W:IsReady() then
-    API.Renderer.DrawCircle3D(API.Player.Position, Diana.W.Radius, 30, 3, Menu.Get("DrawWColor"))
+    API.Renderer.DrawCircle3D(API.Player.Position, Diana.W.Radius, 30, 3, Config.DrawWColor)
   end
 
   if Config.DrawE and Diana.E:IsReady() then
-    API.Renderer.DrawCircle3D(API.Player.Position, Diana.E.Range, 30, 3, Menu.Get("DrawEColor"))
+    API.Renderer.DrawCircle3D(API.Player.Position, Diana.E.Range, 30, 3, Config.DrawEColor)
   end
 
   if Config.DrawR and Diana.R:IsReady() then
-    API.Renderer.DrawCircle3D(API.Player.Position, Diana.R.Radius, 30, 3, Menu.Get("DrawRColor"))
+    API.Renderer.DrawCircle3D(API.Player.Position, Diana.R.Radius, 30, 3, Config.DrawRColor)
   end
 
   local off = 0
@@ -809,9 +878,9 @@ end
   ====================================================================================================
 --]]
 --#region Entrypoint
-
 function OnLoad()
   INFO(CONFIG.MODULE_NAME .. " v" .. CONFIG.MODULE_VERSION .. " by " .. CONFIG.MODULE_AUTHOR .. " loaded")
+  INFO("changelog: " .. CONFIG.CHANGELOG)
   Diana.Init()
   return true
 end
