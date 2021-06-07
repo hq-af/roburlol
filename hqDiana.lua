@@ -475,6 +475,43 @@ function Diana.GetFarmMinions(range, checkBuff)
   
   return result
 end
+
+function Diana.GetFarmCluster(range, checkBuff)
+  local targets = Diana.GetFarmMinions(range, checkBuff)
+  local clusters = {}
+  for _, target in pairs(targets) do
+    if not target.IsMonster then return targets end
+    local cluster = { target }
+    for _, target2 in pairs(targets) do
+      if target2 ~= target then
+        if target.Position:DistanceSqr(target2) < 250*250 then
+          table.insert(target2, cluster)
+        end
+      end
+    end
+    table.insert(clusters, cluster)
+  end
+
+  if table.getn(clusters) > 0 then
+    table.sort(clusters, function(a, b)
+      return a[1].Position:DistanceSqr(API.Player) < b[1].Position:DistanceSqr(API.Player)
+    end)
+
+    return clusters[1]
+  end
+  
+  return {}
+end
+
+function Diana.HasPassiveASBoost(delayMs)
+  for _, buff in pairs(API.Player.Buffs) do
+    if buff ~= nil and buff.Name == "dianapbonusas" and API.Game.GetTime()*1000 + delayMs < buff.EndTime*1000 then
+      return true
+    end
+  end
+
+  return false
+end
 --#endregion
 
 --#region Combo
@@ -628,47 +665,21 @@ end
 --#region Farm
 function Diana.Farm()
 
+
   if Config.UseQFarm and Diana.CanCast(Diana.Q) then
-    local targets = Diana.GetFarmMinions(Diana.Q.Range, false)
+    local targets = Diana.GetFarmCluster(Diana.Q.Range, false)
     local position, count = Diana.Q:GetBestCircularCastPos(targets)
 
     if position and count and count > 0 then
-      if table.getn(targets) > 1 and count and count == 1 then
-        local orbTarget = API.Orbwalker.GetLastTarget()
-        if orbTarget and orbTarget.IsValid and orbTarget.IsAlive and orbTarget.IsMonster and orbTarget.Position:DistanceSqr(API.Player) < 300*300 then
-          position = orbTarget:FastPrediction(250 + API.Game.GetLatency())
-        end
-      end
       Diana.Q:Cast(position)
       return
     end
   end
 
-  if Config.UseWFarm and Diana.CanCast(Diana.W) then
-    local nbHit = table.getn(Diana.GetFarmMinions(Diana.W.Radius, false))
-    if nbHit > 0 then
-      Diana.W:Cast()
-      return
-    end
-  end
-
- 
   if Config.UseEFarm and Diana.CanCast(Diana.E) then
-    local targets = Diana.GetFarmMinions(Diana.E.Range, true)
-    if table.getn(targets) > 0 then
-      local orbTarget = API.Orbwalker.GetLastTarget()
-
-       -- dont use e if has target and passive is up
-      if orbTarget and orbTarget.IsValid and orbTarget.IsAlive and orbTarget.Position:DistanceSqr(API.Player) < 300*300 then
-        for _, buff in pairs(API.Player.Buffs) do
-          if buff ~= nil and API.Game.GetTime() < buff.EndTime - 0.5 and buff.Name == "dianapbonusas" then
-            return
-          end
-        end
-      end
-
+    local targets = Diana.GetFarmCluster(Diana.E.Range, true)
+    if table.getn(targets) > 0 and (not Diana.HasPassiveASBoost(250) or targets[1].Position:DistanceSqr(API.Player) > 350*350) then
       table.sort(targets, function(a, b)
-        if orbTarget and orbTarget.IsValid and orbTarget.IsAlive and orbTarget.IsMonster and a == orbTarget then return true end
         if a.Health < b.Health and a.Health < Diana.E:GetDamage(a) then return true end
         return a.MaxHealth > b.MaxHealth
       end)
@@ -676,6 +687,16 @@ function Diana.Farm()
       return
     end
   end
+
+  if Config.UseWFarm and Diana.CanCast(Diana.W) then
+    local nbHit = table.getn(Diana.GetFarmMinions(Diana.W.Radius, false))
+    if nbHit > 0 and not Diana.HasPassiveASBoost(250) then
+      Diana.W:Cast()
+      return
+    end
+  end
+
+  
 end
 --#endregion
 
