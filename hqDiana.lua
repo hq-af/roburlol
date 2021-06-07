@@ -632,7 +632,7 @@ function Diana.Farm()
     local position, count = Diana.Q:GetBestCircularCastPos(targets)
 
     if position and count and count > 0 then
-      if count and count == 1 then
+      if table.getn(targets) > 1 and count and count == 1 then
         local orbTarget = API.Orbwalker.GetTarget()
         if orbTarget and orbTarget.IsMonster and orbTarget.DistanceSqr(API.Player) < Diana.Q.Range*Diana.Q.Range then
           position = orbTarget:FastPrediction(250 + API.Game.GetLatency())
